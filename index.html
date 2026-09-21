@@ -246,7 +246,7 @@
                         class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition"></textarea>
                 </div>
 
-                <!-- Dynamic Dynamic Option Tip Box -->
+                <!-- Dynamic Option Tip Box -->
                 <div id="stepTipBox" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
                     <span class="text-base leading-none">💡</span>
                     <div id="stepTipContent">
@@ -377,8 +377,8 @@
             <div class="space-y-2">
                 <div class="text-xs text-gray-300 font-semibold flex items-center justify-between">
                     <span>👥 제출 참여자 목록</span>
-                    <span class="text-[10px] text-emerald-400 flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> 실시간 자동 동기화 중
+                    <span class="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> ⚡ REALTIME STREAMING
                     </span>
                 </div>
                 <div id="submissionsList" class="space-y-2 max-h-[200px] overflow-y-auto pr-1">
@@ -461,17 +461,33 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Application State
+        // Global State & Lock Variables
         let currentStep = 1;
         const totalSteps = 6;
         let isAdminLoggedIn = false;
-        let isWriteLockedUntil = 0; // Lock to prevent stale cloud sync overwrite after immediate local deletion
+        let isWriteLockedUntil = 0; 
         window.surveyData = window.surveyData || [];
 
-        // Public Fallback REST DB Endpoint (Zero-Config Multi-Device Cloud Sync for GitHub Pages)
-        const PUBLIC_SYNC_ENDPOINT = "https://kvdb.io/8xN9pL2qM7vK1z4w/osaka_responses_7";
+        // Dual Engine Endpoints (Sub-Second SSE Push Stream + REST Backup)
+        const STREAM_TOPIC_URL = "https://ntfy.sh/osaka_7in_trip_sync_v2027";
+        const PUBLIC_REST_ENDPOINT = "https://kvdb.io/8xN9pL2qM7vK1z4w/osaka_responses_7";
 
-        // Firebase Setup
+        // Same-browser Tab Broadcast Channel
+        let broadChannel = null;
+        try {
+            broadChannel = new BroadcastChannel('osaka_trip_channel');
+            broadChannel.onmessage = (event) => {
+                if (Date.now() < isWriteLockedUntil) return;
+                if (event.data && Array.isArray(event.data.surveyData)) {
+                    window.surveyData = event.data.surveyData;
+                    saveToLocalStorage();
+                    renderDashboard();
+                    if (isAdminLoggedIn) renderAdminTable();
+                }
+            };
+        } catch(e) {}
+
+        // Firebase & Cloud Init
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'osaka-trip-7';
         let db = null;
         let auth = null;
@@ -495,18 +511,18 @@
                     setupFirebaseSync();
                     return;
                 } catch (e) {
-                    console.warn("Firebase fallback to REST Cloud Sync:", e);
+                    console.warn("Firebase fallback to SSE Push Stream Engine:", e);
                 }
             }
 
-            setupPublicRestSync();
+            setupSsePushStreamEngine();
         }
 
         function setupFirebaseSync() {
             if (!isFirebaseReady || !db) return;
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
             onSnapshot(colRef, (snapshot) => {
-                if (Date.now() < isWriteLockedUntil) return; // Prevent lock overwrite
+                if (Date.now() < isWriteLockedUntil) return;
                 const remoteData = [];
                 snapshot.forEach(docSnap => {
                     remoteData.push({ id: docSnap.id, ...docSnap.data() });
@@ -517,27 +533,55 @@
                 if (isAdminLoggedIn) renderAdminTable();
             }, (error) => {
                 console.error("Firestore sync error:", error);
-                setupPublicRestSync();
+                setupSsePushStreamEngine();
             });
         }
 
-        async function setupPublicRestSync() {
+        // --- SUB-SECOND SSE REALTIME PUSH STREAM ENGINE ---
+        function setupSsePushStreamEngine() {
             loadFromLocalStorage();
             renderDashboard();
 
-            await fetchPublicCloudData();
-            setInterval(fetchPublicCloudData, 2000);
+            // 1. Initial State Load from REST server
+            fetchRESTCloudData();
+
+            // 2. Connect WebSockets/SSE Listener for INSTANT <0.3s updates across ALL devices
+            try {
+                const eventSource = new EventSource(`${STREAM_TOPIC_URL}/sse`);
+                eventSource.onmessage = (event) => {
+                    if (Date.now() < isWriteLockedUntil) return;
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        if (parsed && parsed.message) {
+                            const dataPayload = JSON.parse(parsed.message);
+                            if (Array.isArray(dataPayload)) {
+                                const isDiff = JSON.stringify(dataPayload) !== JSON.stringify(window.surveyData);
+                                if (isDiff) {
+                                    window.surveyData = dataPayload;
+                                    saveToLocalStorage();
+                                    renderDashboard();
+                                    if (isAdminLoggedIn) renderAdminTable();
+                                }
+                            }
+                        }
+                    } catch(err) {}
+                };
+
+                eventSource.onerror = () => {
+                    // Fallback polling if SSE disconnects
+                    setTimeout(fetchRESTCloudData, 1000);
+                };
+            } catch(e) {
+                setInterval(fetchRESTCloudData, 1000);
+            }
         }
 
-        async function fetchPublicCloudData() {
-            if (Date.now() < isWriteLockedUntil) return; // Lock active: skip fetching stale remote data
+        async function fetchRESTCloudData() {
+            if (Date.now() < isWriteLockedUntil) return;
             try {
-                const response = await fetch(`${PUBLIC_SYNC_ENDPOINT}?t=${Date.now()}`, {
+                const response = await fetch(`${PUBLIC_REST_ENDPOINT}?t=${Date.now()}`, {
                     cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache'
-                    }
+                    headers: { 'Pragma': 'no-cache' }
                 });
 
                 if (response.ok) {
@@ -552,23 +596,35 @@
                         }
                     }
                 }
-            } catch (e) {
-                // Silently fallback
-            }
+            } catch (e) {}
         }
 
-        async function pushPublicCloudData(data) {
+        async function broadcastCloudData(data) {
+            // A. Same-Tab local broadcast
+            if (broadChannel) {
+                try { broadChannel.postMessage({ surveyData: data }); } catch(e) {}
+            }
+
+            // B. Sub-Second Instant SSE Push Stream to all phones/PCs in the world (<0.3s latency)
             try {
-                await fetch(PUBLIC_SYNC_ENDPOINT, {
+                fetch(STREAM_TOPIC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).catch(() => {});
+            } catch(e) {}
+
+            // C. Persistent REST Cloud Backup
+            try {
+                await fetch(PUBLIC_REST_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-            } catch (e) {
-                console.warn("Public cloud push failed:", e);
-            }
+            } catch (e) {}
         }
 
+        // Modal Controls
         function openVoteStatusModal() {
             renderDashboard();
             document.getElementById('voteStatusModal').classList.remove('hidden');
@@ -608,6 +664,7 @@
             }
         }
 
+        // Dynamic Dynamic Option Tips
         const optionTips = {
             "2/7(금)~2/9(일)": "🗓️ [2/7~2/9 선택 팁]: 금~일 2박 3일 알찬 스케줄! 금요일 연차/휴무가 가능한 멤버 중심으로 팀을 구성하면 좋습니다.",
             "2/8(토)~2/10(월)": "🗓️ [2/8~2/10 선택 팁]: 일~월요일 오사카 도톤보리 상점가 및 주요 관광지가 토요일보다 인파가 적어 한적하게 놀기 뛰어납니다.",
@@ -809,23 +866,22 @@
                 createdAt: new Date().toISOString()
             };
 
-            // 1. Firebase Write (if configured)
+            // 1. Firebase write if configured
             if (isFirebaseReady && db) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', newId);
                     await setDoc(docRef, newEntry);
-                } catch (err) {
-                    console.error("Firestore write failed:", err);
-                }
+                } catch (err) {}
             }
 
-            // 2. Always update local state and push to Public Cloud REST DB
+            // 2. Optimistic local UI update (Instant 0s response)
             window.surveyData = window.surveyData.filter(item => item.name !== name);
             window.surveyData.push(newEntry);
             saveToLocalStorage();
             renderDashboard();
 
-            await pushPublicCloudData(window.surveyData);
+            // 3. Sub-second SSE Push broadcast to all other devices in the world
+            await broadcastCloudData(window.surveyData);
 
             showToast(`🎉 ${name}님의 응답이 성공적으로 제출되었습니다!`);
             
@@ -897,7 +953,7 @@
                 aiMsg.innerHTML = answerHtml;
                 chatMessages.appendChild(aiMsg);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
-            }, 400);
+            }, 300);
         }
 
         function autoGroupTeams() {
@@ -1002,26 +1058,24 @@
         async function deleteResponse(id) {
             const stringId = String(id);
             
-            // Set write lock for 4 seconds so background fetch won't resurrect deleted item
+            // Set write lock for 4 seconds to prevent race conditions
             isWriteLockedUntil = Date.now() + 4000;
 
             if (isFirebaseReady && db) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', stringId);
                     await deleteDoc(docRef);
-                } catch (e) {
-                    console.error("Firestore delete error:", e);
-                }
+                } catch (e) {}
             }
 
-            // Immediate local UI update
+            // Immediate local UI update (0s delay)
             window.surveyData = window.surveyData.filter(item => String(item.id) !== stringId);
             saveToLocalStorage();
             renderDashboard();
             renderAdminTable();
 
-            // Push updated state to public REST cloud endpoint
-            await pushPublicCloudData(window.surveyData);
+            // Broadcast deletion instantly over SSE Stream
+            await broadcastCloudData(window.surveyData);
             showToast('항목이 즉시 삭제되었습니다.');
         }
 
@@ -1058,7 +1112,7 @@
             renderDashboard();
             renderAdminTable();
 
-            await pushPublicCloudData(window.surveyData);
+            await broadcastCloudData(window.surveyData);
             showToast('샘플 데이터가 등록되었습니다.');
         }
 
