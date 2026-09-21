@@ -465,9 +465,10 @@
         let currentStep = 1;
         const totalSteps = 6;
         let isAdminLoggedIn = false;
+        let isWriteLockedUntil = 0; // Lock to prevent stale cloud sync overwrite after immediate local deletion
         window.surveyData = window.surveyData || [];
 
-        // Public Fallback REST DB Endpoint (Zero-Config Multi-Device Cloud Sync)
+        // Public Fallback REST DB Endpoint (Zero-Config Multi-Device Cloud Sync for GitHub Pages)
         const PUBLIC_SYNC_ENDPOINT = "https://kvdb.io/8xN9pL2qM7vK1z4w/osaka_responses_7";
 
         // Firebase Setup
@@ -477,7 +478,6 @@
         let isFirebaseReady = false;
 
         async function initCloudSync() {
-            // First check if Firebase credentials exist
             if (typeof __firebase_config !== 'undefined') {
                 try {
                     const firebaseConfig = JSON.parse(__firebase_config);
@@ -499,7 +499,6 @@
                 }
             }
 
-            // Fallback to Public REST Cloud Sync Engine (Guarantees multi-device sync on GitHub Pages)
             setupPublicRestSync();
         }
 
@@ -507,6 +506,7 @@
             if (!isFirebaseReady || !db) return;
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
             onSnapshot(colRef, (snapshot) => {
+                if (Date.now() < isWriteLockedUntil) return; // Prevent lock overwrite
                 const remoteData = [];
                 snapshot.forEach(docSnap => {
                     remoteData.push({ id: docSnap.id, ...docSnap.data() });
@@ -525,16 +525,13 @@
             loadFromLocalStorage();
             renderDashboard();
 
-            // Initial fetch from public sync cloud
             await fetchPublicCloudData();
-
-            // Poll public REST cloud every 2 seconds for immediate real-time updates without F5
             setInterval(fetchPublicCloudData, 2000);
         }
 
         async function fetchPublicCloudData() {
+            if (Date.now() < isWriteLockedUntil) return; // Lock active: skip fetching stale remote data
             try {
-                // Added cache-busting parameter (?t=timestamp) and no-store headers so browser fetches fresh data without pressing F5
                 const response = await fetch(`${PUBLIC_SYNC_ENDPOINT}?t=${Date.now()}`, {
                     cache: 'no-store',
                     headers: {
@@ -546,7 +543,6 @@
                 if (response.ok) {
                     const remoteData = await response.json();
                     if (Array.isArray(remoteData)) {
-                        // Compare current and new data string to re-render UI only on change
                         const isChanged = JSON.stringify(remoteData) !== JSON.stringify(window.surveyData);
                         if (isChanged) {
                             window.surveyData = remoteData;
@@ -557,7 +553,7 @@
                     }
                 }
             } catch (e) {
-                // Silently fallback to local storage
+                // Silently fallback
             }
         }
 
@@ -612,7 +608,6 @@
             }
         }
 
-        // Option Tips & Dynamic Guidance Engine
         const optionTips = {
             "2/7(금)~2/9(일)": "🗓️ [2/7~2/9 선택 팁]: 금~일 2박 3일 알찬 스케줄! 금요일 연차/휴무가 가능한 멤버 중심으로 팀을 구성하면 좋습니다.",
             "2/8(토)~2/10(월)": "🗓️ [2/8~2/10 선택 팁]: 일~월요일 오사카 도톤보리 상점가 및 주요 관광지가 토요일보다 인파가 적어 한적하게 놀기 뛰어납니다.",
@@ -824,13 +819,12 @@
                 }
             }
 
-            // 2. Always update local state and push to Public Cloud REST DB for GitHub Pages sync
-            window.surveyData = window.surveyData.filter(item => item.name !== name); // replace duplicate name entries
+            // 2. Always update local state and push to Public Cloud REST DB
+            window.surveyData = window.surveyData.filter(item => item.name !== name);
             window.surveyData.push(newEntry);
             saveToLocalStorage();
             renderDashboard();
 
-            // Push to cloud REST database
             await pushPublicCloudData(window.surveyData);
 
             showToast(`🎉 ${name}님의 응답이 성공적으로 제출되었습니다!`);
@@ -913,9 +907,9 @@
                 return;
             }
 
-            const teamA = []; // 2/7~2/9
-            const teamB = []; // 2/8~2/10
-            const flexible = []; // 상관없음/기타
+            const teamA = [];
+            const teamB = [];
+            const flexible = [];
 
             data.forEach(item => {
                 if (item.schedule.includes('2/7')) teamA.push(item.name);
@@ -1008,6 +1002,9 @@
         async function deleteResponse(id) {
             const stringId = String(id);
             
+            // Set write lock for 4 seconds so background fetch won't resurrect deleted item
+            isWriteLockedUntil = Date.now() + 4000;
+
             if (isFirebaseReady && db) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', stringId);
@@ -1017,13 +1014,15 @@
                 }
             }
 
+            // Immediate local UI update
             window.surveyData = window.surveyData.filter(item => String(item.id) !== stringId);
             saveToLocalStorage();
             renderDashboard();
             renderAdminTable();
 
+            // Push updated state to public REST cloud endpoint
             await pushPublicCloudData(window.surveyData);
-            showToast('항목이 삭제되었습니다.');
+            showToast('항목이 즉시 삭제되었습니다.');
         }
 
         function copyKakaoSummary() {
@@ -1047,6 +1046,7 @@
         }
 
         async function resetSampleData() {
+            isWriteLockedUntil = Date.now() + 3000;
             const samples = [
                 { id: '101', name: '민수', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ', '야키니쿠'], memo: '첫날 야키니쿠 예약 필수' },
                 { id: '102', name: '지은', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ'], memo: '쇼핑 타임 원함' },
