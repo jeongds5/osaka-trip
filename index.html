@@ -33,6 +33,7 @@
             }
         }
     </script>
+    
     <style>
         body {
             background-color: #0A0C10;
@@ -80,7 +81,7 @@
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- Header -->
+    <!-- Header Navigation -->
     <header class="max-w-5xl w-full mx-auto glass-panel rounded-2xl p-4 sm:p-5 mb-6 flex items-center justify-between shadow-2xl relative overflow-hidden">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white text-xl font-bold shadow-neon-sm">
@@ -94,7 +95,7 @@
             </div>
         </div>
         
-        <!-- Header Right Buttons: Vote Status + Admin -->
+        <!-- Header Right Action Buttons -->
         <div class="flex items-center gap-2">
             <button onclick="openVoteStatusModal()" class="px-3.5 py-2 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
                 <span>📊</span> <span class="hidden sm:inline">실시간 투표 현황</span>
@@ -132,14 +133,14 @@
 
             <form id="wizardForm" onsubmit="event.preventDefault();" class="space-y-6 min-h-[220px] flex flex-col justify-between">
                 
-                <!-- STEP 1: Name -->
+                <!-- STEP 1: Name Input -->
                 <div id="stepContainer1" class="step-container space-y-3">
                     <label class="block text-xs font-bold text-gray-300">본인의 이름 또는 닉네임</label>
                     <input type="text" id="userName" placeholder="예: 민수, 지은, 태형" 
                         class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition">
                 </div>
 
-                <!-- STEP 2: Schedule -->
+                <!-- STEP 2: Schedule Selection -->
                 <div id="stepContainer2" class="step-container hidden space-y-3">
                     <label class="block text-xs font-bold text-gray-300">선호하는 2월 여행 일정 (3인 or 4인 팀 분할 고려)</label>
                     <div class="space-y-2">
@@ -166,7 +167,7 @@
 
                 <!-- STEP 3: Transport -->
                 <div id="stepContainer3" class="step-container hidden space-y-3">
-                    <label class="block text-xs font-bold text-gray-300">이동 루트 & 출국 방법 (대구 출발 기준 - 리무진 제외)</label>
+                    <label class="block text-xs font-bold text-gray-300">이동 루트 & 출국 방법 (대구 출발 기준 - KTX/철도/자가용)</label>
                     <div class="space-y-2">
                         <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
                             <input type="radio" name="flight" value="대구-부산(김해공항) KTX/동해선" checked onclick="toggleCustomInput('flightCustom', false); updateOptionTip();" class="accent-coral-500">
@@ -189,7 +190,7 @@
                     </div>
                 </div>
 
-                <!-- STEP 4: Stay -->
+                <!-- STEP 4: Accommodation -->
                 <div id="stepContainer4" class="step-container hidden space-y-3">
                     <label class="block text-xs font-bold text-gray-300">희망 숙소 위치 & 숙박 타입</label>
                     <div class="space-y-2">
@@ -249,7 +250,7 @@
                         class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition"></textarea>
                 </div>
 
-                <!-- Dynamic Tip Box -->
+                <!-- Dynamic Option Tip Box -->
                 <div id="stepTipBox" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
                     <span class="text-base leading-none">💡</span>
                     <div id="stepTipContent">
@@ -299,7 +300,7 @@
             </span>
         </div>
 
-        <!-- Chat Messages Area -->
+        <!-- Chat Messages Container -->
         <div id="aiChatMessages" class="space-y-3 max-h-[260px] overflow-y-auto text-xs pr-2">
             <div class="p-3.5 rounded-xl bg-darkbg/90 border border-darkborder text-gray-300 text-xs leading-relaxed">
                 👋 <strong>안녕하세요! 오사카 우정여행 실시간 AI 비서입니다.</strong><br>
@@ -307,7 +308,7 @@
             </div>
         </div>
 
-        <!-- Quick Suggestions -->
+        <!-- Preset Quick Questions -->
         <div class="flex flex-wrap gap-2 pt-1">
             <span class="text-xs text-gray-400 font-semibold self-center mr-1">💡 추천 질문:</span>
             <button onclick="askTravelAi('2월 오사카 날씨와 옷차림 추천해줘')" class="text-xs px-3 py-1.5 rounded-xl bg-darkcard hover:bg-darkborder text-coral-400 border border-coral-500/20 transition flex items-center gap-1.5">
@@ -324,7 +325,7 @@
             </button>
         </div>
 
-        <!-- Input Box -->
+        <!-- Query Input Field -->
         <div class="flex gap-2 pt-1">
             <input type="text" id="aiQueryInput" placeholder="질문을 입력하세요 (예: USJ 닌텐도 월드 정리, 오사카 7인 숙소 추천)" 
                 onkeydown="if(event.key==='Enter') askTravelAi()"
@@ -352,7 +353,7 @@
                 </div>
             </div>
 
-            <!-- Schedule Progress Bars -->
+            <!-- Schedule Bar Graphs -->
             <div class="space-y-3 bg-darkbg p-4 rounded-xl border border-darkborder">
                 <div class="text-xs text-gray-300 font-semibold">🗓️ 일정 선호도 분포</div>
                 <div class="space-y-2 text-xs">
@@ -377,18 +378,18 @@
                 </div>
             </div>
 
-            <!-- Submissions Table List -->
+            <!-- Submissions List -->
             <div class="space-y-2">
                 <div class="text-xs text-gray-300 font-semibold flex items-center justify-between">
                     <span>👥 제출 참여자 목록</span>
                     <span class="text-[10px] text-gray-500">실시간 반영됨</span>
                 </div>
                 <div id="submissionsList" class="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                    <!-- Submissions dynamically rendered here -->
+                    <!-- Dynamic rendering -->
                 </div>
             </div>
 
-            <!-- Kakao / Group Share Callout -->
+            <!-- Copy Kakao Summary Button -->
             <button onclick="copyKakaoSummary()" class="w-full py-3 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm">
                 <i class="fa-solid fa-share-nodes"></i> 단톡방/DM 공유용 요약문 복사
             </button>
@@ -465,13 +466,13 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global State
+        // Application State
         let currentStep = 1;
         const totalSteps = 6;
         let isAdminLoggedIn = false;
         window.surveyData = window.surveyData || [];
 
-        // Firebase Setup
+        // Firebase Initialization
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'osaka-trip-7';
         let db = null;
         let auth = null;
@@ -1033,6 +1034,7 @@
             });
         }
 
+        // Expose functions globally to window object
         window.openVoteStatusModal = openVoteStatusModal;
         window.closeVoteStatusModal = closeVoteStatusModal;
         window.openAdminModal = openAdminModal;
