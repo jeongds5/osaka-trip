@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오사카 7인 우정여행 설문 & 실시간 AI 가이드</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0A0C10',
+                        darkcard: '#141822',
+                        darkborder: '#242B3D',
+                        coral: {
+                            400: '#FF6B50',
+                            500: '#FF385C',
+                            600: '#E02647',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0A0C10;
+            color: #F3F4F6;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(20, 24, 34, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #FF385C 0%, #FF7E40 100%);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #FF385C 0%, #FF8E53 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .shadow-neon {
+            box-shadow: 0 4px 20px -2px rgba(255, 56, 92, 0.35);
+        }
+        .shadow-neon-sm {
+            box-shadow: 0 2px 10px -1px rgba(255, 56, 92, 0.25);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A0C10;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #242B3D;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF385C;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 text-sm">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Header -->
+    <header class="max-w-5xl w-full mx-auto glass-panel rounded-2xl p-4 sm:p-5 mb-6 flex items-center justify-between shadow-2xl relative overflow-hidden">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white text-xl font-bold shadow-neon-sm">
+                ✈️
+            </div>
+            <div>
+                <h1 class="text-base sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                    오사카 7인 우정여행 <span class="gradient-text">조율 웹앱</span>
+                </h1>
+                <p class="text-xs text-gray-400 hidden sm:block">2027년 2월 출국 선호도 조사 & 3인/4인 팀 자동 배정</p>
+            </div>
+        </div>
+        
+        <!-- Header Right Buttons: Vote Status + Admin -->
+        <div class="flex items-center gap-2">
+            <button onclick="openVoteStatusModal()" class="px-3.5 py-2 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <span>📊</span> <span class="hidden sm:inline">실시간 투표 현황</span>
+            </button>
+            <button onclick="openAdminModal()" class="px-3.5 py-2 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <span>👑</span> <span class="hidden sm:inline">관리자</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-5xl w-full mx-auto flex-grow space-y-6">
+
+        <!-- Multi-Step Survey Container Card -->
+        <div class="glass-panel p-5 sm:p-8 rounded-2xl border border-darkborder shadow-2xl space-y-6 relative overflow-hidden">
+            
+            <!-- Step Progress Header -->
+            <div class="border-b border-darkborder pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span id="stepBadge" class="px-2.5 py-1 rounded-full gradient-bg text-white text-[11px] font-bold shadow-neon-sm">
+                            Step 1 / 6
+                        </span>
+                        <h2 id="stepTitle" class="text-base sm:text-lg font-bold text-white">
+                            1. 이름 (닉네임) 입력
+                        </h2>
+                    </div>
+                    <p id="stepSubtitle" class="text-xs text-gray-400 mt-1">친구들이 나를 구별할 수 있도록 이름이나 닉네임을 작성해주세요.</p>
+                </div>
+
+                <!-- Progress Bar visual -->
+                <div class="w-full sm:w-48 bg-darkbg h-2.5 rounded-full border border-darkborder overflow-hidden">
+                    <div id="stepProgressBar" class="h-full gradient-bg transition-all duration-300" style="width: 16.66%;"></div>
+                </div>
+            </div>
+
+            <form id="wizardForm" onsubmit="event.preventDefault();" class="space-y-6 min-h-[220px] flex flex-col justify-between">
+                
+                <!-- STEP 1: Name -->
+                <div id="stepContainer1" class="step-container space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">본인의 이름 또는 닉네임</label>
+                    <input type="text" id="userName" placeholder="예: 민수, 지은, 태형" 
+                        class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition">
+                </div>
+
+                <!-- STEP 2: Schedule -->
+                <div id="stepContainer2" class="step-container hidden space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">선호하는 2월 여행 일정 (3인 or 4인 팀 분할 고려)</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="schedule" value="2/7(금)~2/9(일)" checked onclick="toggleCustomInput('dateCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🗓️ 2월 7일(금) ~ 2월 9일(일) [3인 or 4인 팀]</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="schedule" value="2/8(토)~2/10(월)" onclick="toggleCustomInput('dateCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🗓️ 2월 8일(토) ~ 2월 10일(월) [3인 or 4인 팀]</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="schedule" value="상관없음" onclick="toggleCustomInput('dateCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🤷‍♂️ 어느 날짜든 상관없음 (팀원들 일정에 맞춤)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="schedule" value="custom" id="dateCustomRadio" onclick="toggleCustomInput('dateCustom', true); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-coral-400 font-medium">✏️ 기타 (직접 입력)</span>
+                        </label>
+                        <input type="text" id="dateCustomInput" placeholder="원하는 날짜 직접 입력 (예: 2/6~2/8)" 
+                            class="hidden w-full px-3 py-2 rounded-lg bg-darkbg border border-coral-500/50 text-xs text-white mt-1 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- STEP 3: Transport (Daegu -> Busan/Seoul by KTX or Car) -->
+                <div id="stepContainer3" class="step-container hidden space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">이동 루트 & 출국 방법 (대구 출발 기준 - 리무진 제외)</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="flight" value="대구-부산(김해공항) KTX/동해선" checked onclick="toggleCustomInput('flightCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🚄 대구 ➔ 부산 (KTX/SRT/동해선 ➔ 김해공항)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="flight" value="대구-서울(인천/김포) KTX/공항철도" onclick="toggleCustomInput('flightCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🚄 대구 ➔ 서울/인천공항 (KTX ➔ 공항철도 이용)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="flight" value="자가용 카풀 이동 (부산/인천공항)" onclick="toggleCustomInput('flightCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🚗 자가용 카풀 이동 (대구 ➔ 부산/인천 공항주차장)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="flight" value="custom" id="flightCustomRadio" onclick="toggleCustomInput('flightCustom', true); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-coral-400 font-medium">✏️ 기타 (직접 입력)</span>
+                        </label>
+                        <input type="text" id="flightCustomInput" placeholder="희망 이동수단/루트 직접 입력" 
+                            class="hidden w-full px-3 py-2 rounded-lg bg-darkbg border border-coral-500/50 text-xs text-white mt-1 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- STEP 4: Stay -->
+                <div id="stepContainer4" class="step-container hidden space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">희망 숙소 위치 & 숙박 타입</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="stay" value="도톤보리/난바 대형 에어비앤비 (7인 전용)" checked onclick="toggleCustomInput('stayCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🏠 난바/도톤보리 대형 에어비앤비 (7인 단체 독채)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="stay" value="우메다 호텔 (트윈/트리플룸 분할)" onclick="toggleCustomInput('stayCustom', false); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-gray-200 font-medium">🏨 우메다 깨끗한 호텔 (방 2~3개 분할 예약)</span>
+                        </label>
+                        <label class="flex items-center p-3 rounded-xl bg-darkbg hover:bg-darkborder/50 border border-darkborder cursor-pointer transition">
+                            <input type="radio" name="stay" value="custom" id="stayCustomRadio" onclick="toggleCustomInput('stayCustom', true); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2.5 text-xs text-coral-400 font-medium">✏️ 기타 (직접 입력)</span>
+                        </label>
+                        <input type="text" id="stayCustomInput" placeholder="희망 숙소 위치/스타일 직접 입력" 
+                            class="hidden w-full px-3 py-2 rounded-lg bg-darkbg border border-coral-500/50 text-xs text-white mt-1 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- STEP 5: Activities -->
+                <div id="stepContainer5" class="step-container hidden space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">가장 하고 싶은 놀거리 & 투어 (복수 선택 가능)</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
+                            <input type="checkbox" name="activity" value="USJ 익스프레스 패스" checked onchange="updateOptionTip()" class="accent-coral-500">
+                            <span class="ml-2 text-xs text-gray-300">🎢 유니버설 스튜디오 (USJ)</span>
+                        </label>
+                        <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
+                            <input type="checkbox" name="activity" value="도톤보리 먹방&야키니쿠" checked onchange="updateOptionTip()" class="accent-coral-500">
+                            <span class="ml-2 text-xs text-gray-300">🥩 도톤보리 먹방 & 야키니쿠</span>
+                        </label>
+                        <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
+                            <input type="checkbox" name="activity" value="교토 당일치기 투어" onchange="updateOptionTip()" class="accent-coral-500">
+                            <span class="ml-2 text-xs text-gray-300">⛩️ 교토 당일치기 (청수사/아라시야마)</span>
+                        </label>
+                        <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
+                            <input type="checkbox" name="activity" value="오사카 주유패스 온천&크루즈" onchange="updateOptionTip()" class="accent-coral-500">
+                            <span class="ml-2 text-xs text-gray-300">🎟️ 오사카 주유패스 온천&크루즈</span>
+                        </label>
+                    </div>
+                    <!-- Activity Custom Input -->
+                    <div class="mt-2">
+                        <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
+                            <input type="checkbox" id="actCustomCheckbox" onchange="toggleCustomInput('actCustom', this.checked); updateOptionTip();" class="accent-coral-500">
+                            <span class="ml-2 text-xs text-coral-400 font-medium">✏️ 기타 놀거리 직접 입력</span>
+                        </label>
+                        <input type="text" id="actCustomInput" placeholder="추가하고 싶은 명소/활동 직접 입력" 
+                            class="hidden w-full px-3 py-2 rounded-lg bg-darkbg border border-coral-500/50 text-xs text-white mt-1 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- STEP 6: Memo -->
+                <div id="stepContainer6" class="step-container hidden space-y-3">
+                    <label class="block text-xs font-bold text-gray-300">자유 메모 / 추가 요구사항</label>
+                    <textarea id="userMemo" rows="3" placeholder="예: 첫날 저녁엔 꼭 야키니쿠 먹자! 숙소는 화장실 2개 이상이었으면 함. 알레르기 있음." 
+                        class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition"></textarea>
+                </div>
+
+                <!-- Dynamic Tip Box (Placed under each item) -->
+                <div id="stepTipBox" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
+                    <span class="text-base leading-none">💡</span>
+                    <div id="stepTipContent">
+                        7명의 친구들이 쉽게 알아볼 수 있는 이름이나 닉네임을 작성해주세요!
+                    </div>
+                </div>
+
+                <!-- Wizard Navigation Buttons (Prev / Next / Submit) -->
+                <div class="flex justify-between items-center pt-2 border-t border-darkborder">
+                    <button type="button" id="prevBtn" onclick="changeStep(-1)" class="px-5 py-2.5 rounded-xl bg-darkcard hover:bg-darkborder border border-darkborder text-gray-300 text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> 이전
+                    </button>
+                    
+                    <button type="button" id="nextBtn" onclick="changeStep(1)" class="px-6 py-2.5 rounded-xl gradient-bg text-white text-xs font-bold shadow-neon hover:opacity-90 transition flex items-center gap-1.5">
+                        다음 <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                    
+                    <button type="button" id="submitBtn" onclick="submitSurvey()" class="hidden px-6 py-2.5 rounded-xl gradient-bg text-white text-xs font-bold shadow-neon hover:opacity-90 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-paper-plane mr-1"></i> 설문 응답 제출하기
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Bottom Rectangular Panel: Real-time AI Travel Assistant -->
+    <section class="max-w-5xl w-full mx-auto mt-6 glass-panel p-6 rounded-2xl border border-coral-500/40 space-y-4 relative overflow-hidden shadow-2xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-darkborder gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl gradient-bg flex items-center justify-center text-white text-xl font-bold shadow-neon-sm">
+                    🤖
+                </div>
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        오사카 여행 실시간 AI 가이드
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span> LIVE SEARCH
+                        </span>
+                    </h3>
+                    <p class="text-xs text-gray-400">구글 실시간 검색 연동 — 동대구 KTX/철도, 자가용 이동, 2월 오사카 날씨, USJ 등 무엇이든 물어보세요</p>
+                </div>
+            </div>
+            <span class="text-[10px] px-3 py-1 rounded-full bg-coral-500/10 text-coral-400 font-semibold border border-coral-500/20 self-start sm:self-auto flex items-center gap-1.5">
+                <i class="fa-solid fa-bolt text-amber-400"></i> Gemini 3 Flash Grounding
+            </span>
+        </div>
+
+        <!-- Chat Messages Area -->
+        <div id="aiChatMessages" class="space-y-3 max-h-[260px] overflow-y-auto text-xs pr-2">
+            <div class="p-3.5 rounded-xl bg-darkbg/90 border border-darkborder text-gray-300 text-xs leading-relaxed">
+                👋 <strong>안녕하세요! 오사카 우정여행 실시간 AI 비서입니다.</strong><br>
+                동대구역 KTX/SRT 열차 추천, 부산/인천공항 이동법, 2월 오사카 일기예보 및 옷차림, USJ 익스프레스 팁, 도톤보리 7인 단체 맛집 정보까지 구글 최신 인터넷 검색으로 즉시 찾아드립니다!
+            </div>
+        </div>
+
+        <!-- Quick Suggestions -->
+        <div class="flex flex-wrap gap-2 pt-1">
+            <span class="text-xs text-gray-400 font-semibold self-center mr-1">💡 추천 질문:</span>
+            <button onclick="askTravelAi('2월 오사카 날씨와 옷차림 추천해줘')" class="text-xs px-3 py-1.5 rounded-xl bg-darkcard hover:bg-darkborder text-coral-400 border border-coral-500/20 transition flex items-center gap-1.5">
+                🌤️ 2월 날씨
+            </button>
+            <button onclick="askTravelAi('동대구역에서 부산역 KTX 시간표 및 공항 이동 팁')" class="text-xs px-3 py-1.5 rounded-xl bg-darkcard hover:bg-darkborder text-coral-400 border border-coral-500/20 transition flex items-center gap-1.5">
+                🚄 대구-부산 KTX
+            </button>
+            <button onclick="askTravelAi('오사카 도톤보리 7인 가성비 야키니쿠 맛집 추천')" class="text-xs px-3 py-1.5 rounded-xl bg-darkcard hover:bg-darkborder text-coral-400 border border-coral-500/20 transition flex items-center gap-1.5">
+                🥩 도톤보리 7인 맛집
+            </button>
+            <button onclick="askTravelAi('오사카 주유패스 vs 라피트 특급열차 차이점 정리')" class="text-xs px-3 py-1.5 rounded-xl bg-darkcard hover:bg-darkborder text-coral-400 border border-coral-500/20 transition flex items-center gap-1.5">
+                🎟️ 교통 패스 비교
+            </button>
+        </div>
+
+        <!-- Input Box -->
+        <div class="flex gap-2 pt-1">
+            <input type="text" id="aiQueryInput" placeholder="질문을 입력하세요 (예: USJ 닌텐도 월드 정리, 오사카 7인 숙소 추천)" 
+                onkeydown="if(event.key==='Enter') askTravelAi()"
+                class="flex-grow px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs placeholder-gray-500 focus:outline-none focus:border-coral-500">
+            <button onclick="askTravelAi()" class="px-5 py-3 rounded-xl gradient-bg text-white font-bold text-xs shadow-neon hover:opacity-90 transition flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <i class="fa-solid fa-paper-plane"></i> 질문하기
+            </button>
+        </div>
+    </section>
+
+    <!-- Modal 1: Real-time Vote Status Modal -->
+    <div id="voteStatusModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-6 border border-darkborder shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-5">
+            <div class="flex items-center justify-between border-b border-darkborder pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-coral-400"></i> 실시간 친구들 투표 현황
+                </h3>
+                <div class="flex items-center gap-2">
+                    <span id="responseCountBadge" class="px-2.5 py-1 rounded-full bg-coral-500/20 text-coral-400 border border-coral-500/30 text-[11px] font-bold">
+                        0 / 7명 작성
+                    </span>
+                    <button onclick="closeVoteStatusModal()" class="text-gray-400 hover:text-white ml-2">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Schedule Progress Bars -->
+            <div class="space-y-3 bg-darkbg p-4 rounded-xl border border-darkborder">
+                <div class="text-xs text-gray-300 font-semibold">🗓️ 일정 선호도 분포</div>
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <div class="flex justify-between text-gray-400 mb-1">
+                            <span>2/7(금)~2/9(일)</span>
+                            <span id="barCount1" class="font-bold text-coral-400">0명</span>
+                        </div>
+                        <div class="w-full h-2 rounded-full bg-darkcard overflow-hidden border border-darkborder">
+                            <div id="barWidth1" class="h-full gradient-bg transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-gray-400 mb-1">
+                            <span>2/8(토)~2/10(월)</span>
+                            <span id="barCount2" class="font-bold text-amber-400">0명</span>
+                        </div>
+                        <div class="w-full h-2 rounded-full bg-darkcard overflow-hidden border border-darkborder">
+                            <div id="barWidth2" class="h-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submissions Table List -->
+            <div class="space-y-2">
+                <div class="text-xs text-gray-300 font-semibold flex items-center justify-between">
+                    <span>👥 제출 참여자 목록</span>
+                    <span class="text-[10px] text-gray-500">실시간 반영됨</span>
+                </div>
+                <div id="submissionsList" class="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                    <!-- Submissions dynamically rendered here -->
+                </div>
+            </div>
+
+            <!-- Kakao / Group Share Callout -->
+            <button onclick="copyKakaoSummary()" class="w-full py-3 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm">
+                <i class="fa-solid fa-share-nodes"></i> 단톡방 공유용 요약문 복사
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 2: Admin Auth Modal -->
+    <div id="adminAuthModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 border border-darkborder shadow-2xl relative text-center">
+            <button onclick="closeAdminAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="w-12 h-12 rounded-2xl bg-coral-500/20 border border-coral-500/40 text-coral-400 flex items-center justify-center text-xl mx-auto mb-3">
+                👑
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">관리자 인증</h3>
+            <p class="text-xs text-gray-400 mb-4">비밀번호를 입력하세요.</p>
+            
+            <input type="password" id="adminPinInput" maxlength="6" placeholder="비밀번호 입력" 
+                onkeydown="if(event.key==='Enter') verifyAdminPin()"
+                class="w-full text-center tracking-widest text-lg py-2.5 rounded-xl bg-darkbg border border-darkborder text-white focus:outline-none focus:border-coral-500 mb-4">
+            
+            <button onclick="verifyAdminPin()" class="w-full py-2.5 rounded-xl text-xs font-bold gradient-bg text-white shadow-neon">
+                관리자 로그인
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 3: Admin Panel Modal -->
+    <div id="adminPanelModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-2xl rounded-2xl p-6 border border-darkborder shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-4 border-b border-darkborder mb-4">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    👑 관리자 모드: 데이터 관리 & 3인/4인 팀 조율
+                </h3>
+                <button onclick="closeAdminPanelModal()" class="text-gray-400 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Group Allocation Tool -->
+            <div class="bg-darkbg p-4 rounded-xl border border-darkborder mb-6 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-coral-400">🧩 3인 / 4인 자동 팀 분할 조율기</span>
+                    <button onclick="autoGroupTeams()" class="px-3 py-1.5 rounded-lg gradient-bg text-white text-xs font-bold shadow-neon-sm">
+                        팀 자동 그룹핑
+                    </button>
+                </div>
+                <div id="teamGroupResult" class="text-xs text-gray-300 leading-relaxed bg-darkcard p-3 rounded-lg border border-darkborder">
+                    '팀 자동 그룹핑' 버튼을 누르면 친구들의 일정 응답 현황을 기반으로 optimal 3인 팀과 4인 팀을 구성합니다.
+                </div>
+            </div>
+
+            <!-- Responses Table -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-xs font-bold text-gray-300">
+                    <span>응답 데이터 상세 목록</span>
+                    <button onclick="resetSampleData()" class="text-[11px] text-coral-400 hover:underline">샘플 데이터로 초기화</button>
+                </div>
+                <div id="adminTableContainer" class="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                    <!-- Admin response items -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="max-w-5xl w-full mx-auto mt-6 text-center text-gray-500 text-[11px] py-4">
+        오사카 7인 우정여행 설문 시스템 &copy; 2027. Crafted with precision for Osaka Trip.
+    </footer>
+
+    <!-- Firebase SDK Integration for Real-time Cloud Sync -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Config & Variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'osaka-trip-7';
+        let db = null;
+        let auth = null;
+        let surveyCollectionRef = null;
+
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Authenticate first, then connect to Cloud Firestore
+                const initCloudSync = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    
+                    // Path following STRICT RULE 1: /artifacts/{appId}/public/data/surveys
+                    surveyCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'surveys');
+                    
+                    // Real-time snapshot listener for live sync across all devices
+                    onSnapshot(surveyCollectionRef, (snapshot) => {
+                        window.surveyData = snapshot.docs.map(doc => ({
+                            firestoreId: doc.id,
+                            ...doc.data()
+                        }));
+                        if (typeof window.renderDashboard === 'function') {
+                            window.renderDashboard();
+                        }
+                    }, (err) => {
+                        console.warn("Real-time cloud sync listening warning:", err);
+                    });
+                };
+
+                initCloudSync();
+
+                // Expose helper functions globally
+                window.addSurveyToCloud = async (data) => {
+                    if (!auth.currentUser || !surveyCollectionRef) return false;
+                    await addDoc(surveyCollectionRef, data);
+                    return true;
+                };
+
+                window.deleteSurveyFromCloud = async (docId) => {
+                    if (!auth.currentUser || !surveyCollectionRef) return false;
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'surveys', docId);
+                    await deleteDoc(docRef);
+                    return true;
+                };
+            } catch (e) {
+                console.warn("Cloud sync initialization fallback to local state:", e);
+            }
+        }
+    </script>
+
+    <script>
+        // Global State
+        let currentStep = 1;
+        const totalSteps = 6;
+        let isAdminLoggedIn = false;
+        window.surveyData = [];
+
+        const optionTips = {
+            // Step 2: Schedule
+            "2/7(금)~2/9(일)": "🗓️ [2/7~2/9 선택 팁]: 금~일 2박 3일 알찬 스케줄! 금요일 연차/휴무가 가능한 멤버 중심으로 팀을 구성하면 좋습니다.",
+            "2/8(토)~2/10(월)": "🗓️ [2/8~2/10 선택 팁]: 일~월요일 오사카 도톤보리 상점가 및 주요 관광지가 토요일보다 인파가 적어 한적하게 놀기 뛰어납니다.",
+            "상관없음": "🤷‍♂️ [상관없음 선택 팁]: 친구들의 날짜 선호 비율(3명/4명)에 따라 관리자가 최적의 팀으로 자동 배치해 드립니다.",
+            "dateCustom": "✏️ [기타 날짜 팁]: 희망하시는 구체적인 날짜나 연차 가능 일정을 적어주시면 여행 계획에 반영됩니다.",
+
+            // Step 3: Transport
+            "대구-부산(김해공항) KTX/동해선": "🚄 [대구-부산 KTX 팁]: 동대구역 ➔ 부산역(KTX 45분) ➔ 동해선/경전철 연계가 무척 빠릅니다. 열차 사전 할인을 꼭 확인하세요!",
+            "대구-서울(인천/김포) KTX/공항철도": "🚄 [대구-서울 KTX 팁]: 동대구역 ➔ 서울역 KTX 이용 후 공항철도 직통열차(Express Train)를 탑승하면 정시 도착이 보장됩니다.",
+            "자가용 카풀 이동 (부산/인천공항)": "🚗 [자가용 카풀 팁]: 7명 인원은 차량 2대로 나눠 타고 공항 장기주차장(사전 예약 할인 & 다자녀 할인)을 활용하면 톨비/유류비 가성비 최상입니다.",
+            "flightCustom": "✏️ [기타 이동 팁]: 생각하신 별도의 이동 수단이나 루트를 입력창에 자유롭게 작성해 주세요.",
+
+            // Step 4: Stay
+            "도톤보리/난바 대형 에어비앤비 (7인 전용)": "🏠 [대형 에어비앤비 팁]: 7인 단체 독채는 수건이 넉넉하고 화장실/욕실이 2개 이상인 곳이 필수입니다. 밤에 야식 사와서 다 같이 놀기 최고의 선택!",
+            "우메다 호텔 (트윈/트리플룸 분할)": "🏨 [우메다 호텔 팁]: 난바보다 밤거리가 깨끗하며 교토/고베 이동이 압도적으로 편리합니다. 트리플룸 1개 + 트윈룸 2개 조합을 추천합니다.",
+            "stayCustom": "✏️ [기타 숙소 팁]: 원하시는 특정 지역이나 호텔 스타일을 직접 적어주세요.",
+
+            // Step 5: Activities
+            "USJ 익스프레스 패스": "🎢 [USJ 팁]: 유니버설 스튜디오 익스프레스 패스는 이용일 기준 약 2개월 전 정각에 오픈되니 인원 확정 직후 빛의 속도로 티켓팅해야 합니다!",
+            "도톤보리 먹방&야키니쿠": "🥩 [야키니쿠 팁]: 7명 대인원은 저녁 피크타임(18~20시) 예약을 미리 해두지 않으면 최소 1~2시간 이상 대기해야 하니 사전 예약이 필수입니다.",
+            "교토 당일치기 투어": "⛩️ [교토 투어 팁]: 청수사(키요미즈데라)와 아라시야마 대나무숲은 아침 일찍 출발하는 일일 버스 투어나 한큐 패스 이용을 추천합니다.",
+            "오사카 주유패스 온천&크루즈": "🎟️ [주유패스 팁]: 톤보리 리버크루즈, 햅파이브 관람차, 나니와노유 온천 등 2~3개만 이용해도 패스 가격 본전을 완벽히 뽑습니다."
+        };
+
+        const stepTips = {
+            1: "7명의 친구들이 쉽게 알아볼 수 있는 이름이나 닉네임을 작성해주세요!",
+            2: "2/7~9 (3~4명) vs 2/8~10 (3~4명) 분할 출국 가능! 옵션을 클릭하면 해당 날짜 꿀팁이 나옵니다.",
+            3: "대구 출발 이동 방식을 클릭해 보세요! KTX/자가용 카풀 노선별 추천 팁이 안내됩니다.",
+            4: "숙소 스타일을 선택해 보세요! 7인 단체에 꼭 필요한 숙박 꿀팁이 표시됩니다.",
+            5: "가고 싶은 놀거리를 체크해 보세요! 티켓 예약 시기 및 맛집 예약 팁이 상단에 안내됩니다.",
+            6: "식성(야키니쿠 필수 등), 쇼핑 리스트, 희망 예산이 있다면 자유롭게 적어주세요!"
+        };
+
+        const stepTitles = {
+            1: "1. 이름 (닉네임) 입력",
+            2: "2. 선호하는 여행 일정 (2월 중)",
+            3: "3. 이동 루트 & 공항선택 (대구 출발 - KTX/철도/자가용)",
+            4: "4. 희망 숙소 위치 & 타입",
+            5: "5. 가장 하고 싶은 놀거리 (복수 선택 가능)",
+            6: "6. 자유 메모 / 요구사항"
+        };
+
+        const stepSubtitles = {
+            1: "친구들이 나를 구별할 수 있도록 이름이나 닉네임을 작성해주세요.",
+            2: "3인/4인 팀 분할을 위해 가장 선호하는 날짜를 선택해주세요.",
+            3: "리무진을 제외한 대구 출발 이동 방식을 선택해주세요.",
+            4: "단체 여행 스타일 및 원하는 숙소 타입을 알려주세요.",
+            5: "오사카에서 꼭 가보고 싶은 명소나 활동을 골라주세요.",
+            6: "기타 꼭 전달하고 싶은 내용이 있다면 작성해주세요."
+        };
+
+        function toggleCustomInput(type, show) {
+            const inputEl = document.getElementById(type + 'Input');
+            if (inputEl) {
+                if (show) {
+                    inputEl.classList.remove('hidden');
+                    inputEl.focus();
+                } else {
+                    inputEl.classList.add('hidden');
+                    inputEl.value = '';
+                }
+            }
+        }
+
+        function updateOptionTip() {
+            const tipContentEl = document.getElementById('stepTipContent');
+            if (!tipContentEl) return;
+
+            let customTip = "";
+
+            if (currentStep === 2) {
+                const selected = document.querySelector('input[name="schedule"]:checked')?.value;
+                if (selected === 'custom') customTip = optionTips["dateCustom"];
+                else if (selected && optionTips[selected]) customTip = optionTips[selected];
+            } else if (currentStep === 3) {
+                const selected = document.querySelector('input[name="flight"]:checked')?.value;
+                if (selected === 'custom') customTip = optionTips["flightCustom"];
+                else if (selected && optionTips[selected]) customTip = optionTips[selected];
+            } else if (currentStep === 4) {
+                const selected = document.querySelector('input[name="stay"]:checked')?.value;
+                if (selected === 'custom') customTip = optionTips["stayCustom"];
+                else if (selected && optionTips[selected]) customTip = optionTips[selected];
+            } else if (currentStep === 5) {
+                const checkedAct = document.querySelector('input[name="activity"]:checked')?.value;
+                if (checkedAct && optionTips[checkedAct]) {
+                    customTip = optionTips[checkedAct];
+                } else if (document.getElementById('actCustomCheckbox')?.checked) {
+                    customTip = "✏️ [기타 놀거리 팁]: 원하시는 관광지나 쇼핑 플레이스를 아래 입력창에 적어주세요.";
+                }
+            }
+
+            if (customTip) {
+                tipContentEl.innerText = customTip;
+            } else {
+                tipContentEl.innerText = stepTips[currentStep];
+            }
+        }
+
+        // Change Step (Wizard Logic)
+        function changeStep(direction) {
+            // Validate step 1 before proceeding
+            if (currentStep === 1 && direction > 0) {
+                const name = document.getElementById('userName').value.trim();
+                if (!name) return showToast('이름을 입력해주세요!', 'error');
+            }
+
+            const nextStep = currentStep + direction;
+            if (nextStep < 1 || nextStep > totalSteps) return;
+
+            // Hide all containers
+            for (let i = 1; i <= totalSteps; i++) {
+                const el = document.getElementById(`stepContainer${i}`);
+                if (el) el.classList.add('hidden');
+            }
+
+            currentStep = nextStep;
+
+            // Show target container
+            const targetEl = document.getElementById(`stepContainer${currentStep}`);
+            if (targetEl) targetEl.classList.remove('hidden');
+
+            // Update UI headers
+            document.getElementById('stepBadge').innerText = `Step ${currentStep} / ${totalSteps}`;
+            document.getElementById('stepTitle').innerText = stepTitles[currentStep];
+            document.getElementById('stepSubtitle').innerText = stepSubtitles[currentStep];
+            document.getElementById('stepProgressBar').style.width = `${(currentStep / totalSteps) * 100}%`;
+
+            // Update Dynamic Tip
+            updateOptionTip();
+
+            // Update Navigation Buttons
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const submitBtn = document.getElementById('submitBtn');
+
+            prevBtn.disabled = (currentStep === 1);
+
+            if (currentStep === totalSteps) {
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+            } else {
+                nextBtn.classList.remove('hidden');
+                submitBtn.classList.add('hidden');
+            }
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgColor = type === 'error' ? 'bg-rose-500' : 'bg-coral-500';
+            toast.className = `${bgColor} text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i> ${message}`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Submit Survey Form
+        async function submitSurvey() {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) {
+                changeStep(1 - currentStep); // Return to step 1
+                return showToast('이름을 입력해주세요!', 'error');
+            }
+
+            // Schedule
+            let scheduleVal = document.querySelector('input[name="schedule"]:checked')?.value;
+            if (scheduleVal === 'custom') {
+                scheduleVal = document.getElementById('dateCustomInput').value.trim() || '기타 일정';
+            }
+
+            // Flight/Transport
+            let flightVal = document.querySelector('input[name="flight"]:checked')?.value;
+            if (flightVal === 'custom') {
+                flightVal = document.getElementById('flightCustomInput').value.trim() || '기타 교통';
+            }
+
+            // Stay
+            let stayVal = document.querySelector('input[name="stay"]:checked')?.value;
+            if (stayVal === 'custom') {
+                stayVal = document.getElementById('stayCustomInput').value.trim() || '기타 숙소';
+            }
+
+            // Activities
+            const activities = [];
+            document.querySelectorAll('input[name="activity"]:checked').forEach(cb => {
+                activities.push(cb.value);
+            });
+            if (document.getElementById('actCustomCheckbox')?.checked) {
+                const actCustomText = document.getElementById('actCustomInput').value.trim();
+                if (actCustomText) activities.push(actCustomText);
+            }
+
+            const memo = document.getElementById('userMemo').value.trim();
+
+            const newEntry = {
+                id: Date.now(),
+                name,
+                schedule: scheduleVal,
+                flight: flightVal,
+                stay: stayVal,
+                activity: activities.length > 0 ? activities : ['자유 여행'],
+                memo: memo || '없음',
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to Cloud Database if available, or LocalStorage
+            let isCloudSaved = false;
+            if (typeof window.addSurveyToCloud === 'function') {
+                try {
+                    isCloudSaved = await window.addSurveyToCloud(newEntry);
+                } catch (err) {
+                    console.warn("Cloud save error, falling back to local storage:", err);
+                }
+            }
+
+            if (!isCloudSaved) {
+                window.surveyData.push(newEntry);
+                saveToLocalStorage();
+                renderDashboard();
+            }
+            
+            showToast(`🎉 ${name}님의 응답이 성공적으로 제출되었습니다!`);
+            
+            // Reset Wizard to step 1
+            document.getElementById('wizardForm').reset();
+            ['dateCustom', 'flightCustom', 'stayCustom', 'actCustom'].forEach(type => toggleCustomInput(type, false));
+            
+            // Go back to Step 1
+            changeStep(1 - currentStep);
+
+            // Automatically open Vote Status modal so user can see updated list
+            openVoteStatusModal();
+        }
+
+        // Render Dashboard & Vote Status Modal
+        function renderDashboard() {
+            const surveyData = window.surveyData || [];
+            const countBadge = document.getElementById('responseCountBadge');
+            if (countBadge) countBadge.innerText = `${surveyData.length} / 7명 작성`;
+
+            // Calculate schedule counts
+            let c1 = 0, c2 = 0;
+            surveyData.forEach(item => {
+                if (item.schedule.includes('2/7') || item.schedule.includes('2/7(금)')) c1++;
+                else if (item.schedule.includes('2/8') || item.schedule.includes('2/8(토)')) c2++;
+            });
+
+            document.getElementById('barCount1').innerText = `${c1}명`;
+            document.getElementById('barCount2').innerText = `${c2}명`;
+
+            const total = surveyData.length || 1;
+            document.getElementById('barWidth1').style.width = `${Math.min((c1 / total) * 100, 100)}%`;
+            document.getElementById('barWidth2').style.width = `${Math.min((c2 / total) * 100, 100)}%`;
+
+            // Render submissions list
+            const listContainer = document.getElementById('submissionsList');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            if (surveyData.length === 0) {
+                listContainer.innerHTML = `<div class="text-xs text-gray-500 text-center py-4">아직 작성된 설문이 없습니다.</div>`;
+                return;
+            }
+
+            surveyData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-3 rounded-xl bg-darkcard border border-darkborder space-y-1";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-bold text-white flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-coral-400"></span> ${escapeHtml(item.name)}
+                        </span>
+                        <span class="text-[10px] text-coral-400 font-semibold px-2 py-0.5 rounded-md bg-coral-500/10 border border-coral-500/20">
+                            ${escapeHtml(item.schedule)}
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-gray-400 truncate">
+                        🚆 ${escapeHtml(item.flight)} | 🏠 ${escapeHtml(item.stay)}
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+
+            renderAdminTable();
+        }
+
+        // Render Admin Data Table
+        function renderAdminTable() {
+            const container = document.getElementById('adminTableContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const surveyData = window.surveyData || [];
+            surveyData.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = "p-3 rounded-xl bg-darkcard border border-darkborder flex justify-between items-center text-xs gap-2";
+                row.innerHTML = `
+                    <div class="space-y-0.5 flex-grow">
+                        <div class="font-bold text-white">${escapeHtml(item.name)} <span class="text-[10px] text-coral-400 font-normal">(${escapeHtml(item.schedule)})</span></div>
+                        <div class="text-[10px] text-gray-400">${escapeHtml(item.flight)} / ${escapeHtml(item.stay)}</div>
+                    </div>
+                    <button onclick="deleteResponse('${item.firestoreId || item.id}')" class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition text-[11px] font-semibold whitespace-nowrap">
+                        삭제
+                    </button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        async function deleteResponse(id) {
+            if (typeof window.deleteSurveyFromCloud === 'function' && String(id).length > 10 && isNaN(Number(id))) {
+                await window.deleteSurveyFromCloud(id);
+            } else {
+                window.surveyData = window.surveyData.filter(item => item.id !== id && item.firestoreId !== id);
+                saveToLocalStorage();
+                renderDashboard();
+            }
+            showToast('항목이 삭제되었습니다.');
+        }
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('osaka_survey_data', JSON.stringify(window.surveyData || []));
+            } catch (e) {}
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('osaka_survey_data');
+                if (saved && (!window.surveyData || window.surveyData.length === 0)) {
+                    window.surveyData = JSON.parse(saved);
+                }
+            } catch (e) {}
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        // Initial Load
+        window.onload = function() {
+            loadFromLocalStorage();
+            renderDashboard();
+        };
+    </script>
+</body>
+</html>
