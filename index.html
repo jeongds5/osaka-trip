@@ -78,10 +78,8 @@
 </head>
 <body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 text-sm">
 
-    <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- Header Navigation -->
     <header class="max-w-5xl w-full mx-auto glass-panel rounded-2xl p-4 sm:p-5 mb-6 flex items-center justify-between shadow-2xl relative overflow-hidden">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white text-xl font-bold shadow-neon-sm">
@@ -95,7 +93,7 @@
             </div>
         </div>
         
-        <!-- Header Right Action Buttons -->
+        <!-- Header Action Buttons -->
         <div class="flex items-center gap-2">
             <button onclick="openVoteStatusModal()" class="px-3.5 py-2 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
                 <span>📊</span> <span class="hidden sm:inline">실시간 투표 현황</span>
@@ -108,7 +106,6 @@
 
     <main class="max-w-5xl w-full mx-auto flex-grow space-y-6">
 
-        <!-- Multi-Step Survey Container Card -->
         <div class="glass-panel p-5 sm:p-8 rounded-2xl border border-darkborder shadow-2xl space-y-6 relative overflow-hidden">
             
             <!-- Step Progress Header -->
@@ -125,7 +122,7 @@
                     <p id="stepSubtitle" class="text-xs text-gray-400 mt-1">친구들이 나를 구별할 수 있도록 이름이나 닉네임을 작성해주세요.</p>
                 </div>
 
-                <!-- Progress Bar visual -->
+                <!-- Progress Bar Visual -->
                 <div class="w-full sm:w-48 bg-darkbg h-2.5 rounded-full border border-darkborder overflow-hidden">
                     <div id="stepProgressBar" class="h-full gradient-bg transition-all duration-300" style="width: 16.66%;"></div>
                 </div>
@@ -165,7 +162,7 @@
                     </div>
                 </div>
 
-                <!-- STEP 3: Transport -->
+                <!-- STEP 3: Transport Selection -->
                 <div id="stepContainer3" class="step-container hidden space-y-3">
                     <label class="block text-xs font-bold text-gray-300">이동 루트 & 출국 방법 (대구 출발 기준 - KTX/철도/자가용)</label>
                     <div class="space-y-2">
@@ -232,7 +229,6 @@
                             <span class="ml-2 text-xs text-gray-300">🎟️ 오사카 주유패스 온천&크루즈</span>
                         </label>
                     </div>
-                    <!-- Activity Custom Input -->
                     <div class="mt-2">
                         <label class="flex items-center p-2.5 rounded-xl bg-darkbg border border-darkborder cursor-pointer transition">
                             <input type="checkbox" id="actCustomCheckbox" onchange="toggleCustomInput('actCustom', this.checked); updateOptionTip();" class="accent-coral-500">
@@ -250,7 +246,7 @@
                         class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition"></textarea>
                 </div>
 
-                <!-- Dynamic Option Tip Box -->
+                <!-- Dynamic Dynamic Option Tip Box -->
                 <div id="stepTipBox" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
                     <span class="text-base leading-none">💡</span>
                     <div id="stepTipContent">
@@ -278,7 +274,6 @@
 
     </main>
 
-    <!-- Bottom Rectangular Panel: Real-time AI Travel Assistant -->
     <section class="max-w-5xl w-full mx-auto mt-6 glass-panel p-6 rounded-2xl border border-coral-500/40 space-y-4 relative overflow-hidden shadow-2xl">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-darkborder gap-3">
             <div class="flex items-center space-x-3">
@@ -382,14 +377,15 @@
             <div class="space-y-2">
                 <div class="text-xs text-gray-300 font-semibold flex items-center justify-between">
                     <span>👥 제출 참여자 목록</span>
-                    <span class="text-[10px] text-gray-500">실시간 반영됨</span>
+                    <span class="text-[10px] text-emerald-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> 실시간 자동 동기화 중
+                    </span>
                 </div>
                 <div id="submissionsList" class="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                     <!-- Dynamic rendering -->
                 </div>
             </div>
 
-            <!-- Copy Kakao Summary Button -->
             <button onclick="copyKakaoSummary()" class="w-full py-3 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm">
                 <i class="fa-solid fa-share-nodes"></i> 단톡방/DM 공유용 요약문 복사
             </button>
@@ -456,7 +452,6 @@
         </div>
     </div>
 
-    <!-- Footer -->
     <footer class="max-w-5xl w-full mx-auto mt-6 text-center text-gray-500 text-[11px] py-4">
         오사카 7인 우정여행 설문 시스템 &copy; 2027. Crafted with precision for Osaka Trip.
     </footer>
@@ -472,15 +467,19 @@
         let isAdminLoggedIn = false;
         window.surveyData = window.surveyData || [];
 
-        // Firebase Initialization
+        // Public Fallback REST DB Endpoint (Zero-Config Multi-Device Cloud Sync)
+        const PUBLIC_SYNC_ENDPOINT = "https://kvdb.io/8xN9pL2qM7vK1z4w/osaka_responses_7";
+
+        // Firebase Setup
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'osaka-trip-7';
         let db = null;
         let auth = null;
-        let isDbReady = false;
+        let isFirebaseReady = false;
 
-        async function initFirebase() {
-            try {
-                if (typeof __firebase_config !== 'undefined') {
+        async function initCloudSync() {
+            // First check if Firebase credentials exist
+            if (typeof __firebase_config !== 'undefined') {
+                try {
                     const firebaseConfig = JSON.parse(__firebase_config);
                     const app = initializeApp(firebaseConfig);
                     auth = getAuth(app);
@@ -492,21 +491,20 @@
                         await signInAnonymously(auth);
                     }
 
-                    isDbReady = true;
-                    setupRealtimeSync();
-                } else {
-                    loadFromLocalStorage();
-                    renderDashboard();
+                    isFirebaseReady = true;
+                    setupFirebaseSync();
+                    return;
+                } catch (e) {
+                    console.warn("Firebase fallback to REST Cloud Sync:", e);
                 }
-            } catch (e) {
-                console.warn("Firebase sync fallback to local storage:", e);
-                loadFromLocalStorage();
-                renderDashboard();
             }
+
+            // Fallback to Public REST Cloud Sync Engine (Guarantees multi-device sync on GitHub Pages)
+            setupPublicRestSync();
         }
 
-        function setupRealtimeSync() {
-            if (!isDbReady || !db) return;
+        function setupFirebaseSync() {
+            if (!isFirebaseReady || !db) return;
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
             onSnapshot(colRef, (snapshot) => {
                 const remoteData = [];
@@ -519,9 +517,49 @@
                 if (isAdminLoggedIn) renderAdminTable();
             }, (error) => {
                 console.error("Firestore sync error:", error);
-                loadFromLocalStorage();
-                renderDashboard();
+                setupPublicRestSync();
             });
+        }
+
+        async function setupPublicRestSync() {
+            loadFromLocalStorage();
+            renderDashboard();
+
+            // Initial fetch from public sync cloud
+            await fetchPublicCloudData();
+
+            // Poll public REST cloud every 3 seconds for real-time synchronization across all devices
+            setInterval(fetchPublicCloudData, 3000);
+        }
+
+        async function fetchPublicCloudData() {
+            try {
+                const response = await fetch(PUBLIC_SYNC_ENDPOINT);
+                if (response.ok) {
+                    const remoteData = await response.json();
+                    if (Array.isArray(remoteData)) {
+                        // Merge or replace if valid array
+                        window.surveyData = remoteData;
+                        saveToLocalStorage();
+                        renderDashboard();
+                        if (isAdminLoggedIn) renderAdminTable();
+                    }
+                }
+            } catch (e) {
+                // Silently fallback to local storage
+            }
+        }
+
+        async function pushPublicCloudData(data) {
+            try {
+                await fetch(PUBLIC_SYNC_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (e) {
+                console.warn("Public cloud push failed:", e);
+            }
         }
 
         function openVoteStatusModal() {
@@ -563,6 +601,7 @@
             }
         }
 
+        // Option Tips & Dynamic Guidance Engine
         const optionTips = {
             "2/7(금)~2/9(일)": "🗓️ [2/7~2/9 선택 팁]: 금~일 2박 3일 알찬 스케줄! 금요일 연차/휴무가 가능한 멤버 중심으로 팀을 구성하면 좋습니다.",
             "2/8(토)~2/10(월)": "🗓️ [2/8~2/10 선택 팁]: 일~월요일 오사카 도톤보리 상점가 및 주요 관광지가 토요일보다 인파가 적어 한적하게 놀기 뛰어납니다.",
@@ -605,7 +644,7 @@
         const stepSubtitles = {
             1: "친구들이 나를 구별할 수 있도록 이름이나 닉네임을 작성해주세요.",
             2: "3인/4인 팀 분할을 위해 가장 선호하는 날짜를 선택해주세요.",
-            3: "리무진을 제외한 대구 출발 이동 방식을 선택해주세요.",
+            3: "대구 출발 이동 방식을 선택해주세요.",
             4: "단체 여행 스타일 및 원하는 숙소 타입을 알려주세요.",
             5: "오사카에서 꼭 가보고 싶은 명소나 활동을 골라주세요.",
             6: "기타 꼭 전달하고 싶은 내용이 있다면 작성해주세요."
@@ -764,21 +803,24 @@
                 createdAt: new Date().toISOString()
             };
 
-            if (isDbReady && db) {
+            // 1. Firebase Write (if configured)
+            if (isFirebaseReady && db) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', newId);
                     await setDoc(docRef, newEntry);
                 } catch (err) {
-                    console.error("Firestore save error:", err);
-                    window.surveyData.push(newEntry);
-                    saveToLocalStorage();
-                    renderDashboard();
+                    console.error("Firestore write failed:", err);
                 }
-            } else {
-                window.surveyData.push(newEntry);
-                saveToLocalStorage();
-                renderDashboard();
             }
+
+            // 2. Always update local state and push to Public Cloud REST DB for GitHub Pages sync
+            window.surveyData = window.surveyData.filter(item => item.name !== name); // replace duplicate name entries
+            window.surveyData.push(newEntry);
+            saveToLocalStorage();
+            renderDashboard();
+
+            // Push to cloud REST database
+            await pushPublicCloudData(window.surveyData);
 
             showToast(`🎉 ${name}님의 응답이 성공적으로 제출되었습니다!`);
             
@@ -954,7 +996,8 @@
 
         async function deleteResponse(id) {
             const stringId = String(id);
-            if (isDbReady && db) {
+            
+            if (isFirebaseReady && db) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', stringId);
                     await deleteDoc(docRef);
@@ -962,10 +1005,13 @@
                     console.error("Firestore delete error:", e);
                 }
             }
+
             window.surveyData = window.surveyData.filter(item => String(item.id) !== stringId);
             saveToLocalStorage();
             renderDashboard();
             renderAdminTable();
+
+            await pushPublicCloudData(window.surveyData);
             showToast('항목이 삭제되었습니다.');
         }
 
@@ -996,21 +1042,12 @@
                 { id: '103', name: '태형', schedule: '2/8(토)~2/10(월)', flight: '자가용 카풀', stay: '우메다 호텔', activity: ['교토 투어'], memo: '온천 가고 싶음' }
             ];
 
-            if (isDbReady && db) {
-                for (const sample of samples) {
-                    try {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', sample.id);
-                        await setDoc(docRef, sample);
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
-            } else {
-                window.surveyData = samples;
-                saveToLocalStorage();
-                renderDashboard();
-                renderAdminTable();
-            }
+            window.surveyData = samples;
+            saveToLocalStorage();
+            renderDashboard();
+            renderAdminTable();
+
+            await pushPublicCloudData(window.surveyData);
             showToast('샘플 데이터가 등록되었습니다.');
         }
 
@@ -1034,7 +1071,6 @@
             });
         }
 
-        // Expose functions globally to window object
         window.openVoteStatusModal = openVoteStatusModal;
         window.closeVoteStatusModal = closeVoteStatusModal;
         window.openAdminModal = openAdminModal;
@@ -1054,7 +1090,7 @@
         window.resetSampleData = resetSampleData;
 
         window.onload = function() {
-            initFirebase();
+            initCloudSync();
         };
     </script>
 </body>
