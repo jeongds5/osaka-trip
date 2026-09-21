@@ -105,7 +105,6 @@
         </div>
     </header>
 
-    <!-- Main Content Area -->
     <main class="max-w-5xl w-full mx-auto flex-grow space-y-6">
 
         <!-- Multi-Step Survey Container Card -->
@@ -165,7 +164,7 @@
                     </div>
                 </div>
 
-                <!-- STEP 3: Transport (Daegu -> Busan/Seoul by KTX or Car) -->
+                <!-- STEP 3: Transport -->
                 <div id="stepContainer3" class="step-container hidden space-y-3">
                     <label class="block text-xs font-bold text-gray-300">이동 루트 & 출국 방법 (대구 출발 기준 - 리무진 제외)</label>
                     <div class="space-y-2">
@@ -250,7 +249,7 @@
                         class="w-full px-4 py-3 rounded-xl bg-darkbg border border-darkborder text-white text-xs focus:outline-none focus:border-coral-500 transition"></textarea>
                 </div>
 
-                <!-- Dynamic Tip Box (Placed under each item) -->
+                <!-- Dynamic Tip Box -->
                 <div id="stepTipBox" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
                     <span class="text-base leading-none">💡</span>
                     <div id="stepTipContent">
@@ -258,7 +257,7 @@
                     </div>
                 </div>
 
-                <!-- Wizard Navigation Buttons (Prev / Next / Submit) -->
+                <!-- Wizard Navigation Buttons -->
                 <div class="flex justify-between items-center pt-2 border-t border-darkborder">
                     <button type="button" id="prevBtn" onclick="changeStep(-1)" class="px-5 py-2.5 rounded-xl bg-darkcard hover:bg-darkborder border border-darkborder text-gray-300 text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed">
                         <i class="fa-solid fa-arrow-left mr-1"></i> 이전
@@ -391,7 +390,7 @@
 
             <!-- Kakao / Group Share Callout -->
             <button onclick="copyKakaoSummary()" class="w-full py-3 rounded-xl bg-darkcard hover:bg-darkborder border border-coral-500/30 text-coral-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm">
-                <i class="fa-solid fa-share-nodes"></i> 단톡방 공유용 요약문 복사
+                <i class="fa-solid fa-share-nodes"></i> 단톡방/DM 공유용 요약문 복사
             </button>
         </div>
     </div>
@@ -461,14 +460,69 @@
         오사카 7인 우정여행 설문 시스템 &copy; 2027. Crafted with precision for Osaka Trip.
     </footer>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // Global State
         let currentStep = 1;
         const totalSteps = 6;
         let isAdminLoggedIn = false;
         window.surveyData = window.surveyData || [];
 
-        // Modals Logic
+        // Firebase Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'osaka-trip-7';
+        let db = null;
+        let auth = null;
+        let isDbReady = false;
+
+        async function initFirebase() {
+            try {
+                if (typeof __firebase_config !== 'undefined') {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    isDbReady = true;
+                    setupRealtimeSync();
+                } else {
+                    loadFromLocalStorage();
+                    renderDashboard();
+                }
+            } catch (e) {
+                console.warn("Firebase sync fallback to local storage:", e);
+                loadFromLocalStorage();
+                renderDashboard();
+            }
+        }
+
+        function setupRealtimeSync() {
+            if (!isDbReady || !db) return;
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
+            onSnapshot(colRef, (snapshot) => {
+                const remoteData = [];
+                snapshot.forEach(docSnap => {
+                    remoteData.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                window.surveyData = remoteData;
+                saveToLocalStorage();
+                renderDashboard();
+                if (isAdminLoggedIn) renderAdminTable();
+            }, (error) => {
+                console.error("Firestore sync error:", error);
+                loadFromLocalStorage();
+                renderDashboard();
+            });
+        }
+
         function openVoteStatusModal() {
             renderDashboard();
             document.getElementById('voteStatusModal').classList.remove('hidden');
@@ -664,7 +718,7 @@
             }, 3000);
         }
 
-        function submitSurvey() {
+        async function submitSurvey() {
             const name = document.getElementById('userName').value.trim();
             if (!name) {
                 changeStep(1 - currentStep);
@@ -696,9 +750,10 @@
             }
 
             const memo = document.getElementById('userMemo').value.trim();
+            const newId = String(Date.now());
 
             const newEntry = {
-                id: Date.now(),
+                id: newId,
                 name,
                 schedule: scheduleVal,
                 flight: flightVal,
@@ -708,10 +763,22 @@
                 createdAt: new Date().toISOString()
             };
 
-            window.surveyData.push(newEntry);
-            saveToLocalStorage();
-            renderDashboard();
-            
+            if (isDbReady && db) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', newId);
+                    await setDoc(docRef, newEntry);
+                } catch (err) {
+                    console.error("Firestore save error:", err);
+                    window.surveyData.push(newEntry);
+                    saveToLocalStorage();
+                    renderDashboard();
+                }
+            } else {
+                window.surveyData.push(newEntry);
+                saveToLocalStorage();
+                renderDashboard();
+            }
+
             showToast(`🎉 ${name}님의 응답이 성공적으로 제출되었습니다!`);
             
             document.getElementById('wizardForm').reset();
@@ -730,13 +797,11 @@
 
             const chatMessages = document.getElementById('aiChatMessages');
             
-            // User Message Bubble
             const userMsg = document.createElement('div');
             userMsg.className = "p-3 rounded-xl bg-coral-500/20 border border-coral-500/30 text-coral-200 text-xs ml-6 leading-relaxed flex items-start justify-between";
             userMsg.innerHTML = `<div><strong>Q:</strong> ${escapeHtml(query)}</div> <i class="fa-solid fa-user text-coral-400 mt-0.5"></i>`;
             chatMessages.appendChild(userMsg);
 
-            // Generate Instant Helpful Answer
             setTimeout(() => {
                 const aiMsg = document.createElement('div');
                 aiMsg.className = "p-3.5 rounded-xl bg-darkbg border border-darkborder text-gray-200 text-xs leading-relaxed space-y-2 shadow-inner";
@@ -886,8 +951,17 @@
             });
         }
 
-        function deleteResponse(id) {
-            window.surveyData = window.surveyData.filter(item => String(item.id) !== String(id));
+        async function deleteResponse(id) {
+            const stringId = String(id);
+            if (isDbReady && db) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', stringId);
+                    await deleteDoc(docRef);
+                } catch (e) {
+                    console.error("Firestore delete error:", e);
+                }
+            }
+            window.surveyData = window.surveyData.filter(item => String(item.id) !== stringId);
             saveToLocalStorage();
             renderDashboard();
             renderAdminTable();
@@ -911,18 +985,31 @@
             document.execCommand('copy');
             document.body.removeChild(textArea);
 
-            showToast('📋 단톡방 공유용 요약문이 복사되었습니다!');
+            showToast('📋 단톡방/DM 공유용 요약문이 복사되었습니다!');
         }
 
-        function resetSampleData() {
-            window.surveyData = [
-                { id: 101, name: '민수', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ', '야키니쿠'], memo: '첫날 야키니쿠 예약 필수' },
-                { id: 102, name: '지은', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ'], memo: '쇼핑 타임 원함' },
-                { id: 103, name: '태형', schedule: '2/8(토)~2/10(월)', flight: '자가용 카풀', stay: '우메다 호텔', activity: ['교토 투어'], memo: '온천 가고 싶음' }
+        async function resetSampleData() {
+            const samples = [
+                { id: '101', name: '민수', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ', '야키니쿠'], memo: '첫날 야키니쿠 예약 필수' },
+                { id: '102', name: '지은', schedule: '2/7(금)~2/9(일)', flight: '대구-부산 KTX', stay: '도톤보리 에어비앤비', activity: ['USJ'], memo: '쇼핑 타임 원함' },
+                { id: '103', name: '태형', schedule: '2/8(토)~2/10(월)', flight: '자가용 카풀', stay: '우메다 호텔', activity: ['교토 투어'], memo: '온천 가고 싶음' }
             ];
-            saveToLocalStorage();
-            renderDashboard();
-            renderAdminTable();
+
+            if (isDbReady && db) {
+                for (const sample of samples) {
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', sample.id);
+                        await setDoc(docRef, sample);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+            } else {
+                window.surveyData = samples;
+                saveToLocalStorage();
+                renderDashboard();
+                renderAdminTable();
+            }
             showToast('샘플 데이터가 등록되었습니다.');
         }
 
@@ -946,9 +1033,26 @@
             });
         }
 
+        window.openVoteStatusModal = openVoteStatusModal;
+        window.closeVoteStatusModal = closeVoteStatusModal;
+        window.openAdminModal = openAdminModal;
+        window.closeAdminAuthModal = closeAdminAuthModal;
+        window.openAdminPanelModal = openAdminPanelModal;
+        window.closeAdminPanelModal = closeAdminPanelModal;
+        window.verifyAdminPin = verifyAdminPin;
+        window.toggleCustomInput = toggleCustomInput;
+        window.updateOptionTip = updateOptionTip;
+        window.changeStep = changeStep;
+        window.showToast = showToast;
+        window.submitSurvey = submitSurvey;
+        window.askTravelAi = askTravelAi;
+        window.autoGroupTeams = autoGroupTeams;
+        window.deleteResponse = deleteResponse;
+        window.copyKakaoSummary = copyKakaoSummary;
+        window.resetSampleData = resetSampleData;
+
         window.onload = function() {
-            loadFromLocalStorage();
-            renderDashboard();
+            initFirebase();
         };
     </script>
 </body>
