@@ -528,21 +528,32 @@
             // Initial fetch from public sync cloud
             await fetchPublicCloudData();
 
-            // Poll public REST cloud every 3 seconds for real-time synchronization across all devices
-            setInterval(fetchPublicCloudData, 3000);
+            // Poll public REST cloud every 2 seconds for immediate real-time updates without F5
+            setInterval(fetchPublicCloudData, 2000);
         }
 
         async function fetchPublicCloudData() {
             try {
-                const response = await fetch(PUBLIC_SYNC_ENDPOINT);
+                // Added cache-busting parameter (?t=timestamp) and no-store headers so browser fetches fresh data without pressing F5
+                const response = await fetch(`${PUBLIC_SYNC_ENDPOINT}?t=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
+                });
+
                 if (response.ok) {
                     const remoteData = await response.json();
                     if (Array.isArray(remoteData)) {
-                        // Merge or replace if valid array
-                        window.surveyData = remoteData;
-                        saveToLocalStorage();
-                        renderDashboard();
-                        if (isAdminLoggedIn) renderAdminTable();
+                        // Compare current and new data string to re-render UI only on change
+                        const isChanged = JSON.stringify(remoteData) !== JSON.stringify(window.surveyData);
+                        if (isChanged) {
+                            window.surveyData = remoteData;
+                            saveToLocalStorage();
+                            renderDashboard();
+                            if (isAdminLoggedIn) renderAdminTable();
+                        }
                     }
                 }
             } catch (e) {
