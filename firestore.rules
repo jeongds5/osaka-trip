@@ -1,0 +1,137 @@
+rules_version = '2';
+
+// =====================================================================
+// 오사카 7인 우정여행 — Firestore 보안 규칙
+//
+// 컬렉션 구조
+//   responses/{uid}     공개 투표 응답 (이름 · 날짜 · 이동수단 · 숙소 · 활동)
+//                       → 로그인(익명 포함)한 모든 참가자가 읽기 가능, 메모 없음
+//   privateNotes/{uid}  숙소 의견 · 추가 메모 → 본인과 관리자만 읽기
+//   names/{nameKey}     이름 중복 방지용 잠금 문서 { uid }
+//   admins/{uid}        관리자 목록 → Firebase 콘솔에서만 추가 (앱에서 쓰기 불가)
+//
+// 주의: 익명 인증은 "같은 브라우저"를 식별할 뿐 실제 사람의 신원을 보장하지 않습니다.
+//       사이트 주소를 아는 사람은 누구나 익명 로그인 후 공개 응답(이름 포함)을 볼 수 있습니다.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- 공통 함수 ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ---------- 값 검증 ----------
+    function validPref(v) {
+      return v is int && v >= 0 && v <= 2;
+    }
+    function validDates(d) {
+      return d is map
+        && d.keys().hasAll(['d0205', 'd0206', 'd0207', 'd0208', 'd0209', 'd0210'])
+        && d.keys().hasOnly(['d0205', 'd0206', 'd0207', 'd0208', 'd0209', 'd0210'])
+        && validPref(d.d0205) && validPref(d.d0206) && validPref(d.d0207)
+        && validPref(d.d0208) && validPref(d.d0209) && validPref(d.d0210)
+        // 최소 하루는 가능(1) 또는 선호(2)
+        && (d.d0205 + d.d0206 + d.d0207 + d.d0208 + d.d0209 + d.d0210) > 0;
+    }
+    function validName(n) {
+      return n is string && n.size() >= 1 && n.size() <= 20;
+    }
+    function validResponse(r) {
+      return r.keys().hasAll(['name', 'nameKey', 'dates', 'transport', 'lodgingType',
+                              'lodgingPriority', 'activities', 'createdAt', 'updatedAt'])
+        && r.keys().hasOnly(['name', 'nameKey', 'dates', 'transport', 'lodgingType',
+                             'lodgingPriority', 'activities', 'createdAt', 'updatedAt'])
+        && validName(r.name)
+        && r.nameKey is string && r.nameKey.size() >= 1 && r.nameKey.size() <= 20
+        && validDates(r.dates)
+        && r.transport is list && r.transport.size() >= 1 && r.transport.size() <= 4
+        && r.transport.hasOnly(['busan', 'seoul', 'carpool', 'airportbus'])
+        && r.lodgingType in ['hotel', 'ryokan', 'apartment', 'hostel']
+        && r.lodgingPriority in ['location', 'price', 'facility', 'space']
+        && r.activities is list && r.activities.size() >= 1 && r.activities.size() <= 6
+        && r.activities.hasOnly(['sightseeing', 'shopping', 'food', 'onsen', 'nightview', 'free'])
+        && r.createdAt is timestamp
+        && r.updatedAt == request.time;
+    }
+    // 같은 배치(batch) 안에서 이름 잠금이 본인 소유로 존재해야 함 → 이름 중복 제출 차단
+    function holdsNameLock(key) {
+      return existsAfter(/databases/$(database)/documents/names/$(key))
+        && getAfter(/databases/$(database)/documents/names/$(key)).data.uid == request.auth.uid;
+    }
+
+    // ---------- 공개 응답 ----------
+    match /responses/{uid} {
+      allow read: if signedIn();
+
+      allow create: if isOwner(uid)
+        && validResponse(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && holdsNameLock(request.resource.data.nameKey);
+
+      allow update: if isOwner(uid)
+        && validResponse(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && holdsNameLock(request.resource.data.nameKey)
+        // 이름을 바꿨다면 이전 이름 잠금은 같은 배치에서 반드시 삭제 (이름 선점 방지)
+        && (request.resource.data.nameKey == resource.data.nameKey
+            || !existsAfter(/databases/$(database)/documents/names/$(resource.data.nameKey)));
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ---------- 비공개 메모 (본인 + 관리자만) ----------
+    match /privateNotes/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasAll(['lodgingNote', 'memo', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['lodgingNote', 'memo', 'updatedAt'])
+        && request.resource.data.lodgingNote is string
+        && request.resource.data.lodgingNote.size() <= 200
+        && request.resource.data.memo is string
+        && request.resource.data.memo.size() <= 500
+        && request.resource.data.updatedAt == request.time
+        // 공개 응답이 있어야만 메모 저장 가능
+        && existsAfter(/databases/$(database)/documents/responses/$(uid));
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ---------- 이름 잠금 ----------
+    match /names/{key} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && key.size() >= 1 && key.size() <= 20
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        // 본인 응답의 nameKey와 일치할 때만 잠글 수 있음
+        && getAfter(/databases/$(database)/documents/responses/$(request.auth.uid)).data.nameKey == key;
+
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // ---------- 관리자 목록 ----------
+    // 본인이 관리자인지 확인하는 용도로 "자기 문서"만 읽을 수 있음.
+    // 쓰기는 누구도 불가 → Firebase 콘솔(관리자 권한)에서만 등록 가능.
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // ---------- 그 외 모든 경로 차단 ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
